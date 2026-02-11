@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { ITEMS } from '@/constants';
+import { ITEMS, SHIPPING_OPTIONS } from '@/constants';
 
-const stripe = new Stripe(process.env.STRIPE_TEST_SK!, {
-  apiVersion: '2025-08-27.basil',
-});
+const stripe = new Stripe(
+  'sk_test_51Sz0IEDpcOtDCQGwTFyHyaR7gID8NWWYEGE55Klh2lCdMufBsX3KOJNV5iErJ4cQzrB646Kyt1DFl4wRTyoSMgyo003bEuizoc',
+  {
+    // @ts-expect-error - apiVersion type error
+    apiVersion: '2025-08-27.basil;custom_checkout_payment_form_preview=v1',
+  }
+);
 
 // const calculateOrderAmount = (_items: any) => {
 //   // Replace this constant with a calculation of the order's amount
@@ -15,7 +19,7 @@ const stripe = new Stripe(process.env.STRIPE_TEST_SK!, {
 
 export async function POST(request: Request) {
   try {
-    // const body = await request.json();
+    const body = await request.json();
     // const { items } = body;
     // const items = [];
 
@@ -46,6 +50,7 @@ export async function POST(request: Request) {
 
       // All needed for payment mode
       mode: 'payment',
+      payment_method_types: ['card', 'us_bank_account', 'klarna'],
       // Hardcode for now just one per ITEM
       line_items: Object.values(ITEMS).map((item) => ({
         price_data: {
@@ -60,17 +65,79 @@ export async function POST(request: Request) {
           enabled: true,
         },
       })),
+      // Shipping address collection + methods
+      shipping_address_collection: {
+        allowed_countries: ['US', 'CA'],
+      },
+      shipping_options: SHIPPING_OPTIONS.map((option) => ({
+        shipping_rate_data: {
+          display_name: option.name,
+          type: 'fixed_amount',
+          fixed_amount: {
+            amount: option.price,
+            currency: 'usd',
+          },
+          delivery_estimate: {
+            minimum: option.min,
+            maximum: option.max,
+          },
+        },
+      })),
 
-      // [{
-      //   price_data: {
-      //     currency: 'usd',
-      //     product_data: {
-      //       name: 'XL T-Shirt',
-      //     },
-      //     unit_amount: ,
+      // Enable billing address
+      billing_address_collection: 'required',
+
+      // Enable Tax ID collection
+      tax_id_collection: {
+        enabled: true,
+        // TODO(cskillingstad): required not supported for ui_mode: 'custom'
+        // Hopefully Guacamole supports this
+        // required: 'if_supported',
+      },
+      // TODO(cskillingstad): name_collection not supported for ui_mode: 'custom'
+      // When this is enabled, TIDE should not show business name input
+      // Hopefully Guacamole supports this
+      // name_collection: {
+      //   business: {
+      //     enabled: true,
       //   },
-      //   quantity: 1,
-      // }],
+      // },
+
+      // Enable SPM
+      customer: body.returningUser ? 'cus_Twum9CXoI45P5W' : undefined,
+      customer_update: body.returningUser
+        ? {
+            name: 'auto',
+            shipping: 'auto',
+          }
+        : undefined,
+      // payment_intent_data: {
+      //   setup_future_usage: 'off_session',
+      // },
+      saved_payment_method_options: body.returningUser
+        ? {
+            payment_method_save: 'enabled',
+            payment_method_remove: 'enabled',
+          }
+        : undefined,
+
+      // custom_fields: [
+      //   {
+      //     key: 'test1', // Unique identifier for this field
+      //     type: 'text',
+      //     label: {
+      //       type: 'custom',
+      //       custom: 'Test custom field 1',
+      //     },
+      //     // Optional configuration for text fields:
+      //     // text: {
+      //     //   minimum_length: 2,
+      //     //   maximum_length: 50,
+      //     //   default_value: 'Your text here'
+      //     // },
+      //     optional: false, // Set to true to make it optional
+      //   },
+      // ],
 
       return_url: `${request.headers.get('origin')}/complete?session_id={CHECKOUT_SESSION_ID}`,
     });
