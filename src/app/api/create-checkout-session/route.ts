@@ -2,13 +2,10 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { ITEMS, SHIPPING_OPTIONS } from '@/constants';
 
-const stripe = new Stripe(
-  'sk_test_51Sz0IEDpcOtDCQGwTFyHyaR7gID8NWWYEGE55Klh2lCdMufBsX3KOJNV5iErJ4cQzrB646Kyt1DFl4wRTyoSMgyo003bEuizoc',
-  {
-    // @ts-expect-error - apiVersion type error
-    apiVersion: '2025-08-27.basil;custom_checkout_payment_form_preview=v1',
-  }
-);
+const stripe = new Stripe(process.env.STRIPE_TEST_SK!, {
+  // @ts-expect-error - apiVersion type error
+  apiVersion: '2025-08-27.basil;custom_checkout_payment_form_preview=v1',
+});
 
 // const calculateOrderAmount = (_items: any) => {
 //   // Replace this constant with a calculation of the order's amount
